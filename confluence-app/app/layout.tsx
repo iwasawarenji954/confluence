@@ -11,9 +11,10 @@ interface Page {
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [pageName, setPageName] = useState('');
   const [pages, setPages] = useState<Page[]>([]);
+  const [openPages, setOpenPages] = useState<number[]>([]); // 開いているページのIDを管理
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, parentTitle: string | null } | null>(null);
+  const [pageName, setPageName] = useState('');
 
   // 初期階層データ
   useEffect(() => {
@@ -49,11 +50,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     setPages(initialPages);
   }, []);
 
+  // トグルの処理
+  const togglePage = (pageId: number) => {
+    if (openPages.includes(pageId)) {
+      setOpenPages(openPages.filter(id => id !== pageId)); // 開いているページを閉じる
+    } else {
+      setOpenPages([...openPages, pageId]); // ページを開く
+    }
+  };
+
   // 右クリック時のメニュー表示
   const handleContextMenu = (e: React.MouseEvent, pageTitle: string) => {
     e.preventDefault(); // 既定の右クリックメニューを無効化
     e.stopPropagation(); // イベント伝播を防ぐ
-    console.log("Right-clicked on page:", pageTitle); // どのページが右クリックされたか確認
     setContextMenu({
       x: e.pageX,
       y: e.pageY,
@@ -66,14 +75,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     if (contextMenu?.parentTitle && pageName.trim() !== '') {
       const newPage = { id: Date.now(), title: pageName, content: '' };
 
-      console.log("Adding new page under:", contextMenu.parentTitle); // 親階層がどこか確認
-
       // ここで正しい親階層を選び、新しいページをその下に追加する
       const updatedPages = pages.map((page) => {
         return addPageToHierarchy(page, contextMenu.parentTitle || '', newPage); // 親タイトルを渡す
       });
-
-      console.log("Updated pages:", updatedPages); // 更新されたページ構造を確認
 
       setPages(updatedPages);
       setPageName('');
@@ -89,18 +94,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   // 階層にページを追加する再帰的な関数
   const addPageToHierarchy = (page: Page, parentTitle: string, newPage: Page): Page => {
-    console.log(`Checking page: ${page.title} against parent: ${parentTitle}`); // 各ページのタイトルを確認
-
-    // 親階層が見つかった場合、新しいページを追加
     if (page.title === parentTitle) {
-      console.log(`Found parent: ${page.title}, adding new page under it.`);
       return {
         ...page,
         children: [...(page.children || []), newPage],
       };
     }
 
-    // 子階層がある場合、再帰的に探索
     if (page.children) {
       return {
         ...page,
@@ -108,7 +108,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       };
     }
 
-    return page; // 変更なしで返す
+    return page;
   };
 
   return (
@@ -132,7 +132,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <nav>
                 <ul>
                   {pages.map((page) => (
-                    <PageItem key={page.id} page={page} onContextMenu={handleContextMenu} />
+                    <PageItem 
+                      key={page.id} 
+                      page={page} 
+                      openPages={openPages} 
+                      togglePage={togglePage} 
+                      onContextMenu={handleContextMenu}
+                    />
                   ))}
                 </ul>
               </nav>
@@ -175,16 +181,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 }
 
 // 階層構造を表示するための再帰的コンポーネント
-const PageItem = ({ page, onContextMenu }: { page: Page, onContextMenu: (e: React.MouseEvent, title: string) => void }) => {
+const PageItem = ({ page, openPages, togglePage, onContextMenu }: { page: Page, openPages: number[], togglePage: (id: number) => void, onContextMenu: (e: React.MouseEvent, title: string) => void }) => {
+  const isOpen = openPages.includes(page.id); // 開いているかどうかを確認
+
   return (
-    <li onContextMenu={(e) => onContextMenu(e, page.title)}>
-      <span className="block py-2 px-4 text-gray-700 hover:bg-gray-300 rounded">
+    <li>
+      <span 
+        className="block py-2 px-4 text-gray-700 hover:bg-gray-300 rounded cursor-pointer"
+        onClick={() => togglePage(page.id)}
+        onContextMenu={(e) => onContextMenu(e, page.title)} // 右クリックメニューの設定
+      >
         {page.title}
       </span>
-      {page.children && (
+      {isOpen && page.children && (
         <ul className="pl-4">
           {page.children.map((child) => (
-            <PageItem key={child.id} page={child} onContextMenu={onContextMenu} />
+            <PageItem 
+              key={child.id} 
+              page={child} 
+              openPages={openPages} 
+              togglePage={togglePage} 
+              onContextMenu={onContextMenu} 
+            />
           ))}
         </ul>
       )}
