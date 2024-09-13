@@ -191,6 +191,8 @@ const PageItem = ({ page, openPages, togglePage, onContextMenu }: { page: Page, 
         onClick={() => togglePage(page.id)}
         onContextMenu={(e) => onContextMenu(e, page.title)} // 右クリックメニューの設定
       >
+        {/* 三角形アイコンの表示 */}
+        <span className="mr-2">{isOpen ? '▼' : '▶'}</span>
         {page.title}
       </span>
       {isOpen && page.children && (
